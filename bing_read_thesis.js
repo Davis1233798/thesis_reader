@@ -40,7 +40,7 @@ async function sendRequest(prompt) {
         console.log('modifiedPrompt:', modifiedPrompt);
         const response = await axios.get(`http://127.0.0.1:5500`, {
             params: {
-                text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key=>value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法,5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果`
+                text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key => value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法, 5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果`
             }
         });
 
@@ -82,7 +82,7 @@ function saveToDatabase(data, url) {
     if (url !== undefined) {
         checkAndReplace2(url);
         // 存入 thesis 表
-        const insertQuery = `INSERT INTO thesis (response) VALUES (?)`;
+        const insertQuery = `INSERT INTO thesis (response) VALUES(?)`;
         connection.query(insertQuery, [jsonData], (error, results) => {
             if (error) throw error;
             console.log('Data saved to thesis:', results.insertId);
