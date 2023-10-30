@@ -87,13 +87,14 @@ function saveToDatabase(data, url, id) {
             if (error) throw error;
             console.log('Data saved to thesis:', results.insertId);
 
-            // 更新 url 表
-            console.log(url);
-            const updateQuery = `UPDATE url SET is_used = 1 WHERE id=${id}`;
-            connection.query(updateQuery, [url], (error, results) => {
-                if (error) throw error;
-                console.log(`URL updated: ${url}`);
-            });
+
+        });
+        // 更新 url 表
+        console.log(url);
+        const updateQuery = `UPDATE url SET is_used = 1 WHERE id=${id}`;
+        connection.query(updateQuery, [url], (error, results) => {
+            if (error) throw error;
+            console.log(`URL updated: ${url}`);
         });
     } else {
 
@@ -101,35 +102,46 @@ function saveToDatabase(data, url, id) {
 }
 
 async function main() {
-    const query = 'SELECT id,url FROM url where is_taken=0 ORDER BY id ASC LIMIT 1'; // 替換為你的表格名稱和欄位名稱
+    let continueProcessing = true;
 
-    connection.query(query, async (error, results, fields) => {
-        if (error) {
-            console.error('Error fetching URLs:', error);
-            return;
-        }
-        console.log('Results:', results)
+    while (continueProcessing) {
+        const query = 'SELECT id, url FROM url WHERE is_taken=0 ORDER BY id ASC LIMIT 1';
 
-        const prompts = results.map(row => row.url);
-        const id = results.map(row => row.id);
-        console.log('Prompts:', prompts);
-        querys = `UPDATE url SET is_taken=1 WHERE id = ${id}`;
-        connection.query(querys, async (error, results, fields) => {
-            if (error) {
-                console.error('Error fetching URLs:', error);
-                return;
-            }
+        const results = await new Promise((resolve, reject) => {
+            connection.query(query, (error, results) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve(results);
+            });
         });
-        // for (let i = 0; i < prompts.length; i++) {
-        const data = await sendRequest(prompts);
-        if (data) {
-            await saveToDatabase(data, prompts, id);
-        }
-        // }
 
-        // 關閉數據庫連接
-        connection.end();
-    });
+        if (results.length === 0) {
+            continueProcessing = false;
+        } else {
+            const row = results[0];
+            const data = await sendRequest(row.url);
+            if (data) {
+                await saveToDatabase(data, row.url, row.id);
+            }
+
+            // 更新 is_taken
+            await new Promise((resolve, reject) => {
+                const updateQuery = `UPDATE url SET is_taken=1 WHERE id = ${row.id}`;
+                connection.query(updateQuery, (error, results) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+        }
+    }
+
+    // 關閉數據庫連接
+    connection.end();
 }
 
 main();
