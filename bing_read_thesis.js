@@ -2,6 +2,8 @@ const axios = require('axios');
 const mysql = require('mysql');
 require('dotenv').config();
 
+
+console.log(process.env.GCP_HOST);
 const connection = mysql.createConnection({
     host: process.env.GCP_HOST,
     user: process.env.GCP_USER_NAME,
