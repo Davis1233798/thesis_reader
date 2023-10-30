@@ -2,6 +2,8 @@ const axios = require('axios');
 const mysql = require('mysql');
 require('dotenv').config();
 
+
+console.log(process.env.GCP_HOST);
 const connection = mysql.createConnection({
     host: process.env.GCP_HOST,
     user: process.env.GCP_USER_NAME,
@@ -10,11 +12,17 @@ const connection = mysql.createConnection({
     charset: 'utf8mb4'
 });
 
+// 連接數據庫
 connection.connect();
 
 function checkAndReplace(prompt) {
     return prompt.includes('abs') ? prompt.replace('abs', 'pdf') : prompt;
 }
+function checkAndReplace2(prompt) {
+    return prompt.includes('pdf') ? prompt.replace('pdf', 'abs') : prompt;
+}
+
+
 
 function containsArxiv(str, start, end) {
     const subStr = str.substring(start, end);
@@ -28,14 +36,20 @@ function containsProhibitedText(data) {
 async function sendRequest(prompt) {
     try {
         const modifiedPrompt = checkAndReplace(prompt);
+        const query = 'UPDATE url SET is_taken=1 WHERE url = ?';
+        console.log('modifiedPrompt:', modifiedPrompt);
         const response = await axios.get(`http://127.0.0.1:5500`, {
             params: {
-                text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key => value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法, 5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果`
+                text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key=>value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法,5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果`
             }
         });
 
-        if (containsProhibitedText(response.data)) {
-            return null;
+        console.log('Response received:', response.data);
+        const startIndex = response.data.indexOf('文獻連結');
+        const endIndex = response.data.indexOf('研究方法');
+        if ((startIndex !== -1 && endIndex !== -1 && !containsArxiv(response.data, startIndex, endIndex)) || containsProhibitedText(response.data)) {
+            console.log('Re-sending request due to missing arxiv or prohibited text...');
+            return await sendRequest(prompt);
         }
 
         return response.data;
@@ -45,10 +59,15 @@ async function sendRequest(prompt) {
     }
 }
 
-async function updateUrlUsage(id) {
-    const query = 'UPDATE url SET is_used = 1 WHERE id = ?';
+function extractUrl(data) {
+    const urlMatch = data.match(/文獻連結: (https?:\/\/[^\s]+)/);
+    return urlMatch ? urlMatch[1] : null;
+}
+
+async function updateUrlUsage(url) {
     return new Promise((resolve, reject) => {
-        connection.query(query, [id], (error, results) => {
+        const query = 'UPDATE url SET is_used = 1 WHERE url = ?';
+        connection.query(query, [url], (error, results) => {
             if (error) {
                 reject(error);
             } else {
@@ -58,70 +77,59 @@ async function updateUrlUsage(id) {
     });
 }
 
-function saveToDatabase(data, id) {
+function saveToDatabase(data, url) {
     const jsonData = JSON.stringify(data);
-    const insertQuery = `INSERT INTO thesis (response) VALUES(?)`;
-    connection.query(insertQuery, [jsonData], async (error, results) => {
-        if (error) throw error;
-        console.log('Data saved to thesis:', results.insertId);
+    if (url !== undefined) {
+        checkAndReplace2(url);
+        // 存入 thesis 表
+        const insertQuery = `INSERT INTO thesis (response) VALUES (?)`;
+        connection.query(insertQuery, [jsonData], (error, results) => {
+            if (error) throw error;
+            console.log('Data saved to thesis:', results.insertId);
 
-        const updated = await updateUrlUsage(id);
-        if (updated) {
-            console.log(`URL with ID ${id} updated`);
-        } else {
-            console.log(`Failed to update URL with ID ${id}`);
-        }
-    });
+            // 更新 url 表
+            console.log(url);
+            const updateQuery = `UPDATE url SET is_used = 1 WHERE url = ?`;
+            connection.query(updateQuery, [url], (error, results) => {
+                if (error) throw error;
+                console.log(`URL updated: ${url}`);
+            });
+        });
+    } else {
+
+    }
 }
 
 async function main() {
-    try {
-        await connection.beginTransaction();
+    const query = 'SELECT id,url FROM url where is_taken=0 AND is_used=0 LIMIT 1'; // 替換為你的表格名稱和欄位名稱
 
-        const selectQuery = 'SELECT id, url FROM url WHERE is_taken=0 LIMIT 1;';
-        const [selectResults] = await new Promise((resolve, reject) => {
-            connection.query(selectQuery, (error, results) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(results);
-                }
-            });
-        });
-
-
-        if (selectResults.url != null && selectResults.id != 0) {
-            const id = selectResults.id;
-            const url = selectResults.url;
-
-            const updateQuery = 'UPDATE url SET is_taken=1 WHERE id = ?;';
-
-            await new Promise((resolve, reject) => {
-                connection.query(updateQuery, [id], (error) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
-
-            await connection.commit();
-
-            const data = await sendRequest(url);
-            if (data) {
-                saveToDatabase(data, id);
-            }
-        } else {
-            await connection.commit();
-            console.log("沒有更多未處理的 URL。");
+    connection.query(query, async (error, results, fields) => {
+        if (error) {
+            console.error('Error fetching URLs:', error);
+            return;
         }
-    } catch (error) {
-        console.error('錯誤發生:', error);
-        await connection.rollback();
-    } finally {
+        console.log('Results:', results)
+
+        const prompts = results.map(row => row.url);
+        const id = results.map(row => row.id);
+        console.log('Prompts:', prompts);
+        querys = `UPDATE url SET is_taken=1 WHERE id = ${id}`;
+        connection.query(querys, async (error, results, fields) => {
+            if (error) {
+                console.error('Error fetching URLs:', error);
+                return;
+            }
+        });
+        // for (let i = 0; i < prompts.length; i++) {
+        const data = await sendRequest(prompts);
+        if (data) {
+            await saveToDatabase(data, prompts);
+        }
+        // }
+
+        // 關閉數據庫連接
         connection.end();
-    }
+    });
 }
 
 main();
