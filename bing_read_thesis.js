@@ -101,7 +101,7 @@ function saveToDatabase(data, url) {
 }
 
 async function main() {
-    const query = 'SELECT id,url FROM url where is_taken=0 AND is_used=0 LIMIT 1'; // 替換為你的表格名稱和欄位名稱
+    const query = 'SELECT id,url FROM url where is_taken=0 ORDER BY id ASC LIMIT 1'; // 替換為你的表格名稱和欄位名稱
 
     connection.query(query, async (error, results, fields) => {
         if (error) {
