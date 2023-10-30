@@ -120,6 +120,7 @@ async function main() {
         if (results.length === 0) {
             continueProcessing = false;
         } else {
+            const row = results[0];
             // 更新 is_taken
             await new Promise((resolve, reject) => {
                 const updateQuery = `UPDATE url SET is_taken=1 WHERE id = ${row.id}`;
@@ -131,7 +132,7 @@ async function main() {
                     }
                 });
             });
-            const row = results[0];
+
             const data = await sendRequest(row.url);
             if (data) {
                 await saveToDatabase(data, row.url, row.id);
