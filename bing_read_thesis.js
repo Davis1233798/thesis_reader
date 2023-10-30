@@ -101,25 +101,59 @@ function saveToDatabase(data, url) {
 }
 
 async function main() {
-    const query = 'SELECT url FROM url where is_taken=0 LIMIT=1'; // 替換為你的表格名稱和欄位名稱
-    connection.query(query, async (error, results, fields) => {
-        if (error) {
-            console.error('Error fetching URLs:', error);
-            return;
-        }
+    try {
+        // 開始事務
+        await connection.beginTransaction();
 
-        const prompts = results.map(row => row.url);
+        // 步驟 1: 選擇一個未處理的 URL
+        const selectQuery = 'SELECT url FROM url WHERE is_taken=0 LIMIT 1;';
+        const [selectResults] = await new Promise((resolve, reject) => {
+            connection.query(selectQuery, (error, results) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(results);
+                }
+            });
+        });
+        console.log('selectResults:', selectResults.url);
 
-        for (let i = 0; i < prompts.length; i++) {
-            const data = await sendRequest(prompts[i]);
+        // 檢查是否有查詢結果
+        if (selectResults.url != '' && selectResults.url != null && selectResults.url != undefined) {
+            const url = selectResults.url;
+
+            // 步驟 2: 更新選擇的 URL 狀態
+            const updateQuery = 'UPDATE url SET is_taken=1 WHERE url = ?;';
+            await new Promise((resolve, reject) => {
+                connection.query(updateQuery, [url], (error) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+
+            // 提交事務
+            await connection.commit();
+
+            // 處理 URL
+            const data = await sendRequest(url);
             if (data) {
-                await saveToDatabase(data, prompts[i]);
+                await saveToDatabase(data, url);
             }
+        } else {
+            // 沒有查詢結果，提交事務並輸出訊息
+            await connection.commit();
+            console.log("沒有更多未處理的 URL。");
         }
-
+    } catch (error) {
+        console.error('錯誤發生:', error);
+        await connection.rollback();
+    } finally {
         // 關閉數據庫連接
         connection.end();
-    });
+    }
 }
 
 main();
