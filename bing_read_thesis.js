@@ -36,6 +36,7 @@ function containsProhibitedText(data) {
 async function sendRequest(prompt) {
     try {
         const modifiedPrompt = checkAndReplace(prompt);
+        const query = 'UPDATE url SET is_taken=1 WHERE url = ?';
         console.log('modifiedPrompt:', modifiedPrompt);
         const response = await axios.get(`http://127.0.0.1:5500`, {
             params: {
@@ -100,7 +101,7 @@ function saveToDatabase(data, url) {
 }
 
 async function main() {
-    const query = 'SELECT url FROM url'; // 替換為你的表格名稱和欄位名稱
+    const query = 'SELECT url FROM url where is_taken=0 '; // 替換為你的表格名稱和欄位名稱
     connection.query(query, async (error, results, fields) => {
         if (error) {
             console.error('Error fetching URLs:', error);
