@@ -2,8 +2,6 @@ const axios = require('axios');
 const mysql = require('mysql');
 require('dotenv').config();
 
-
-console.log(process.env.GCP_HOST);
 const connection = mysql.createConnection({
     host: process.env.GCP_HOST,
     user: process.env.GCP_USER_NAME,
@@ -12,17 +10,11 @@ const connection = mysql.createConnection({
     charset: 'utf8mb4'
 });
 
-// 連接數據庫
 connection.connect();
 
 function checkAndReplace(prompt) {
     return prompt.includes('abs') ? prompt.replace('abs', 'pdf') : prompt;
 }
-function checkAndReplace2(prompt) {
-    return prompt.includes('pdf') ? prompt.replace('pdf', 'abs') : prompt;
-}
-
-
 
 function containsArxiv(str, start, end) {
     const subStr = str.substring(start, end);
@@ -36,20 +28,14 @@ function containsProhibitedText(data) {
 async function sendRequest(prompt) {
     try {
         const modifiedPrompt = checkAndReplace(prompt);
-        const query = 'UPDATE url SET is_taken=1 WHERE url = ?';
-        console.log('modifiedPrompt:', modifiedPrompt);
         const response = await axios.get(`http://127.0.0.1:5500`, {
             params: {
                 text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key => value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法, 5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果`
             }
         });
 
-        console.log('Response received:', response.data);
-        const startIndex = response.data.indexOf('文獻連結');
-        const endIndex = response.data.indexOf('研究方法');
-        if ((startIndex !== -1 && endIndex !== -1 && !containsArxiv(response.data, startIndex, endIndex)) || containsProhibitedText(response.data)) {
-            console.log('Re-sending request due to missing arxiv or prohibited text...');
-            return await sendRequest(prompt);
+        if (containsProhibitedText(response.data)) {
+            return null;
         }
 
         return response.data;
@@ -59,15 +45,10 @@ async function sendRequest(prompt) {
     }
 }
 
-function extractUrl(data) {
-    const urlMatch = data.match(/文獻連結: (https?:\/\/[^\s]+)/);
-    return urlMatch ? urlMatch[1] : null;
-}
-
-async function updateUrlUsage(url) {
+async function updateUrlUsage(id) {
+    const query = 'UPDATE url SET is_used = 1 WHERE id = ?';
     return new Promise((resolve, reject) => {
-        const query = 'UPDATE url SET is_used = 1 WHERE url = ?';
-        connection.query(query, [url], (error, results) => {
+        connection.query(query, [id], (error, results) => {
             if (error) {
                 reject(error);
             } else {
@@ -77,36 +58,27 @@ async function updateUrlUsage(url) {
     });
 }
 
-function saveToDatabase(data, url) {
+function saveToDatabase(data, id) {
     const jsonData = JSON.stringify(data);
-    if (url !== undefined) {
-        checkAndReplace2(url);
-        // 存入 thesis 表
-        const insertQuery = `INSERT INTO thesis (response) VALUES(?)`;
-        connection.query(insertQuery, [jsonData], (error, results) => {
-            if (error) throw error;
-            console.log('Data saved to thesis:', results.insertId);
+    const insertQuery = `INSERT INTO thesis (response) VALUES(?)`;
+    connection.query(insertQuery, [jsonData], async (error, results) => {
+        if (error) throw error;
+        console.log('Data saved to thesis:', results.insertId);
 
-            // 更新 url 表
-            console.log(url);
-            const updateQuery = `UPDATE url SET is_used = 1 WHERE url = ?`;
-            connection.query(updateQuery, [url], (error, results) => {
-                if (error) throw error;
-                console.log(`URL updated: ${url}`);
-            });
-        });
-    } else {
-
-    }
+        const updated = await updateUrlUsage(id);
+        if (updated) {
+            console.log(`URL with ID ${id} updated`);
+        } else {
+            console.log(`Failed to update URL with ID ${id}`);
+        }
+    });
 }
 
 async function main() {
     try {
-        // 開始事務
         await connection.beginTransaction();
 
-        // 步驟 1: 選擇一個未處理的 URL
-        const selectQuery = 'SELECT url FROM url WHERE is_taken=0 LIMIT 1;';
+        const selectQuery = 'SELECT id, url FROM url WHERE is_taken=0 LIMIT 1;';
         const [selectResults] = await new Promise((resolve, reject) => {
             connection.query(selectQuery, (error, results) => {
                 if (error) {
@@ -116,16 +88,16 @@ async function main() {
                 }
             });
         });
-        console.log('selectResults:', selectResults.url);
 
-        // 檢查是否有查詢結果
-        if (selectResults.url != '' && selectResults.url != null && selectResults.url != undefined) {
+
+        if (selectResults.url != null && selectResults.id != 0) {
+            const id = selectResults.id;
             const url = selectResults.url;
 
-            // 步驟 2: 更新選擇的 URL 狀態
-            const updateQuery = 'UPDATE url SET is_taken=1 WHERE url = ?;';
+            const updateQuery = 'UPDATE url SET is_taken=1 WHERE id = ?;';
+
             await new Promise((resolve, reject) => {
-                connection.query(updateQuery, [url], (error) => {
+                connection.query(updateQuery, [id], (error) => {
                     if (error) {
                         reject(error);
                     } else {
@@ -134,16 +106,13 @@ async function main() {
                 });
             });
 
-            // 提交事務
             await connection.commit();
 
-            // 處理 URL
             const data = await sendRequest(url);
             if (data) {
-                await saveToDatabase(data, url);
+                saveToDatabase(data, id);
             }
         } else {
-            // 沒有查詢結果，提交事務並輸出訊息
             await connection.commit();
             console.log("沒有更多未處理的 URL。");
         }
@@ -151,7 +120,6 @@ async function main() {
         console.error('錯誤發生:', error);
         await connection.rollback();
     } finally {
-        // 關閉數據庫連接
         connection.end();
     }
 }
