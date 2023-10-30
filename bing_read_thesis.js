@@ -77,7 +77,7 @@ async function updateUrlUsage(url) {
     });
 }
 
-function saveToDatabase(data, url) {
+function saveToDatabase(data, url, id) {
     const jsonData = JSON.stringify(data);
     if (url !== undefined) {
         checkAndReplace2(url);
@@ -89,7 +89,7 @@ function saveToDatabase(data, url) {
 
             // 更新 url 表
             console.log(url);
-            const updateQuery = `UPDATE url SET is_used = 1 WHERE url = ?`;
+            const updateQuery = `UPDATE url SET is_used = 1 WHERE id=${id}`;
             connection.query(updateQuery, [url], (error, results) => {
                 if (error) throw error;
                 console.log(`URL updated: ${url}`);
@@ -123,7 +123,7 @@ async function main() {
         // for (let i = 0; i < prompts.length; i++) {
         const data = await sendRequest(prompts);
         if (data) {
-            await saveToDatabase(data, prompts);
+            await saveToDatabase(data, prompts, id);
         }
         // }
 
