@@ -1,8 +1,7 @@
-import axios from 'axios';
-import mysql from 'mysql';
-import dotenv from 'dotenv';
+const axios = require('axios');
+const mysql = require('mysql');
+require('dotenv').config();
 
-dotenv.config();
 
 console.log(process.env.GCP_HOST);
 const connection = mysql.createConnection({
@@ -19,9 +18,7 @@ connection.connect();
 function checkAndReplace(prompt) {
     return prompt.includes('abs') ? prompt.replace('abs', 'pdf') : prompt;
 }
-function checkAndReplace2(prompt) {
-    return prompt.includes('pdf') ? prompt.replace('pdf', 'abs') : prompt;
-}
+
 
 function extractDomain(url) {
     // 移除協議（如 http://, https://）和 'www'
@@ -38,7 +35,7 @@ function containsArxiv(str, start, end, url) {
 }
 
 function containsProhibitedText(data) {
-    return data.includes('很抱歉，我無法直接閱讀或提供特定網站上的內容');
+    return data.includes('很抱歉');
 }
 
 async function sendRequest(prompt) {
