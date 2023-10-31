@@ -77,17 +77,16 @@ async function updateUrlUsage(url) {
     });
 }
 
-function saveToDatabase(data, url, id) {
+function saveToDatabase(data, url, id, prompt) {
     const jsonData = JSON.stringify(data);
+    const jsonPrompt = JSON.stringify(prompt);
     if (url !== undefined) {
-        checkAndReplace2(url);
-        // 存入 thesis 表
-        const insertQuery = `INSERT INTO thesis (response) VALUES (?)`;
-        connection.query(insertQuery, [jsonData], (error, results) => {
+
+        // 存入 thesis 表，包含 id
+        const insertQuery = `INSERT INTO thesis (response, url_id,prompt) VALUES (?, ?,?)`;
+        connection.query(insertQuery, [jsonData, id, jsonPrompt], (error, results) => {
             if (error) throw error;
             console.log('Data saved to thesis:', results.insertId);
-
-
         });
         // 更新 url 表
         console.log(url);
