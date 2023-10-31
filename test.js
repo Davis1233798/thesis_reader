@@ -1,11 +1,13 @@
 const mysql = require('mysql');
-
+require('dotenv').config();
 const connection = mysql.createConnection({
-    host: '127.0.0.1',
-    user: 'root',
-    password: 'root',
-    database: 'nodejs'
+    host: process.env.GCP_HOST,
+    user: process.env.GCP_USER_NAME,
+    password: process.env.GCP_PASSWORD,
+    database: 'thesis',
+    charset: 'utf8mb4',
 });
+
 
 connection.connect(err => {
     if (err) {
@@ -16,10 +18,31 @@ connection.connect(err => {
     console.log('数据库已连接，连接ID为 ' + connection.threadId);
 });
 
-connection.query('SELECT * FROM thesis', (err, rows, fields) => {
-    if (err) throw err;
 
-    console.log('数据: ', rows);
+
+function extractDomain(url) {
+    // 移除協議（如 http://, https://）和 'www'
+    const domain = url.replace(/(https?:\/\/)?(www\.)?/, '');
+
+    // 從 URL 中取得主域名部分（在第一個 '/' 之前的部分）
+    return domain.split('/')[0].split('.')[0];
+}
+
+function containsDomain(str, start, end, url) {
+    const subStr = str.substring(start, end);
+    const domain = extractDomain(url);
+    return subStr.includes(domain);
+}
+
+
+
+
+connection.query('SELECT url FROM url', (err, rows, fields) => {
+    if (err) throw err;
+    for (let i = 0; i < rows.length; i++) {
+        // 假設我們想檢查整個 url 字段，並將其與自己進行比較
+        console.log(containsDomain(rows[i].url, 0, rows[i].url.length, rows[i].url));
+    }
 });
 
 

@@ -43,7 +43,7 @@ function extractData(str, keyRegex, nextKeyRegex) {
 async function processThesis() {
     try {
         // 從連接池中獲取連接
-        const [rows] = await pool.query('SELECT id, response FROM thesis WHERE is_used = 0');
+        const [rows] = await pool.query('SELECT id, response FROM thesis WHERE is_used IS NULL');
         console.log('rows:', rows);
         for (let row of rows) {
             let data = {};

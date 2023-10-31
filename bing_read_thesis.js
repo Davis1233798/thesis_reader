@@ -24,9 +24,18 @@ function checkAndReplace2(prompt) {
 
 
 
-function containsArxiv(str, start, end) {
+function extractDomain(url) {
+    // 移除協議（如 http://, https://）和 'www'
+    const domain = url.replace(/(https?:\/\/)?(www\.)?/, '');
+
+    // 從 URL 中取得主域名部分（在第一個 '/' 之前的部分）
+    return domain.split('/')[0].split('.')[0];
+}
+
+function containsArxiv(str, start, end, url) {
     const subStr = str.substring(start, end);
-    return subStr.includes('arxiv');
+    const domain = extractDomain(url);
+    return subStr.includes(domain);
 }
 
 function containsProhibitedText(data) {
