@@ -19,6 +19,7 @@ function checkAndReplace(prompt) {
 
 function extractDomain(url) {
     if (!url || typeof url !== 'string') {
+        console.error('Invalid url:', url);
         return '';
     }
     const domain = url.replace(/(https?:\/\/)?(www\.)?/, '');
@@ -26,9 +27,18 @@ function extractDomain(url) {
 }
 
 function containsArxiv(str, start, end, url) {
-    if (!url) return false;
+    if (!url) {
+        console.error('Invalid url:', url);
+        return false;
+    }
     const subStr = str.substring(start, end);
     const domain = extractDomain(url);
+    console.log('url:', url);
+    console.log('str:', str);
+    console.log('start:', start);
+    console.log('subStr:', subStr.substring(start, end));
+    console.log('domain:', domain);
+    console.log('subStr:', subStr.includes(domain));
     return subStr.includes(domain);
 }
 
@@ -52,6 +62,8 @@ async function sendRequest(prompt) {
         if ((startIndex !== -1 && endIndex !== -1 && !containsArxiv(response.data, startIndex, endIndex, modifiedPrompt)) || containsProhibitedText(response.data)) {
             console.log('Re-sending request due to missing arxiv or prohibited text...');
             return await sendRequest(prompt);
+        } else {
+            console.log('Request accepted!'.prompt);
         }
 
         return response.data;
@@ -59,24 +71,6 @@ async function sendRequest(prompt) {
         console.error('Request failed:', error);
         return null;
     }
-}
-
-function extractUrl(data) {
-    const urlMatch = data.match(/文獻連結: (https?:\/\/[^\s]+)/);
-    return urlMatch ? urlMatch[1] : null;
-}
-
-async function updateUrlUsage(url) {
-    return new Promise((resolve, reject) => {
-        const query = 'UPDATE url SET is_used = 1 WHERE url = ?';
-        connection.query(query, [url], (error, results) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve(results.affectedRows > 0);
-            }
-        });
-    });
 }
 
 function saveToDatabase(data, url, id, prompt) {
@@ -130,7 +124,7 @@ async function main() {
 
             const data = await sendRequest(row.url);
             if (data) {
-                await saveToDatabase(data, row.url, row.id);
+                await saveToDatabase(data, row.url, row.id, row.prompt);
             }
         }
     }
