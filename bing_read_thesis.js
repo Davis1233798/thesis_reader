@@ -27,23 +27,34 @@ function extractDomain(url) {
         console.error('Invalid url:', url);
         return '';
     }
+
     console.log('extractDomain-url:', url);
-    const domain = url.replace(/(https?:\/\/)?(www\.)?/, '');
-    return domain.split('/')[0].split('.')[0];
+
+    // Using a regular expression to match domain pattern
+    const match = url.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:/\n]+)/);
+
+    if (match) {
+        return match[1];
+    }
+
+    return '';
 }
 
-function containsArxiv(str, start, end, url) {
+function containsArxiv(response, start, end, url) {
+    const str = response.data;
     console.log('url before !:', url);
     if (!url) {
         console.error('Invalid url:', url);
         return false;
     }
+    end > 0 ? end = end : end = start + 100;
     const subStr = str.substring(start, end);
     const domain = extractDomain(url);
     console.log('url:', url);
     console.log('str:', str);
     console.log('start:', start);
-    console.log('subStr:', subStr.substring(start, end));
+    console.log('end:', end);
+    console.log('subStr:', subStr);
     console.log('domain:', domain);
     console.log('subStr:', subStr.includes(domain));
     return subStr.includes(domain);
@@ -59,14 +70,14 @@ async function sendRequest(prompt) {
         console.log('URL for request:', modifiedPrompt);
         const response = await axios.get(`http://127.0.0.1:5500`, {
             params: {
-                text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key=>value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法,5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果`
+                text: `你是一個學術專家 閱讀 ${modifiedPrompt} 用key=>value的方式呈現以下資訊 1.文獻名稱2.APA7引用格式3.文獻連結4.這篇文獻的研究方法,5.這篇文獻何對提示詞的量化方法6.這篇文獻的實驗步驟7.這篇文獻的研究成果 文獻連結必須詳細`
             }
         });
 
         console.log('Response received:', response.data);
         const startIndex = response.data.indexOf('文獻連結');
         const endIndex = response.data.indexOf('研究方法');
-        if ((startIndex !== -1 && endIndex !== -1 && !containsArxiv(response.data, startIndex, endIndex, modifiedPrompt)) || containsProhibitedText(response.data)) {
+        if ((startIndex !== -1 && endIndex !== -1 && !containsArxiv(response, startIndex, endIndex, modifiedPrompt)) || containsProhibitedText(response.data)) {
             console.log('Re-sending request due to missing arxiv or prohibited text...');
             return await sendRequest(prompt);
         } else {
