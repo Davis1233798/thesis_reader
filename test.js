@@ -21,10 +21,12 @@ connection.connect(err => {
 
 
 function extractDomain(url) {
-    // 移除協議（如 http://, https://）和 'www'
+    if (!url || typeof url !== 'string') {
+        console.error('Invalid url:', url);
+        return '';
+    }
+    console.log('extractDomain-url:', url);
     const domain = url.replace(/(https?:\/\/)?(www\.)?/, '');
-
-    // 從 URL 中取得主域名部分（在第一個 '/' 之前的部分）
     return domain.split('/')[0].split('.')[0];
 }
 

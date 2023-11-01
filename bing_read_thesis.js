@@ -22,11 +22,13 @@ function extractDomain(url) {
         console.error('Invalid url:', url);
         return '';
     }
+    console.log('extractDomain-url:', url);
     const domain = url.replace(/(https?:\/\/)?(www\.)?/, '');
     return domain.split('/')[0].split('.')[0];
 }
 
 function containsArxiv(str, start, end, url) {
+    console.log('url before !:', url);
     if (!url) {
         console.error('Invalid url:', url);
         return false;
