@@ -1,6 +1,10 @@
-const axios = require('axios');
-const mysql = require('mysql');
-require('dotenv').config();
+// const axios = require('axios');
+// const mysql = require('mysql');
+// require('dotenv').config();
+import axios from 'axios';
+import mysql from 'mysql';
+import dotenv from 'dotenv';
+dotenv.config();
 
 console.log(process.env.GCP_HOST);
 const connection = mysql.createConnection({
