@@ -1,13 +1,15 @@
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
+dotenv.config();
+
 
 // 創建 MySQL 連接池
 const pool = mysql.createPool({
-    host: process.env.GCP_HOST,
-    user: process.env.GCP_USER_NAME,
-    password: process.env.GCP_PASSWORD,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    port: 3307,
     database: 'thesis',
-    charset: 'utf8mb4',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0

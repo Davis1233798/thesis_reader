@@ -1,11 +1,13 @@
-const mysql = require('mysql2');
-require('dotenv').config();
+import mysql from 'mysql';
+import dotenv from 'dotenv';
+dotenv.config();
 // Cloud SQL 連接配置
 
 const connection = mysql.createConnection({
-    host: process.env.GCP_HOST,
-    user: process.env.GCP_USER_NAME,
-    password: process.env.GCP_PASSWORD,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    port: 3307,
     database: 'thesis',
     charset: 'utf8mb4'
 });
@@ -21,7 +23,7 @@ connection.connect(err => {
 });
 
 // 更新 `thesis` 表中的 `is_used` 字段
-connection.query('UPDATE `thesis` SET `is_used` = 0', (error, results, fields) => {
+connection.query('UPDATE `thesis` SET `is_used` = 0 WHERE t_method = ""', (error, results, fields) => {
     if (error) {
         console.error('执行更新操作时出错: ' + error.stack);
         connection.end();

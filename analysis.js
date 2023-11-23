@@ -1,8 +1,9 @@
-require('dotenv').config();
-const mariadb = require('mariadb');
+import mysql from 'mysql';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // 数据库连接配置
-const pool = mariadb.createPool({
+const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
@@ -18,7 +19,8 @@ const keys = [
     '這篇文獻的研究方法[:：]',
     '這篇文獻何對提示詞的量化方法[:：]',
     '這篇文獻的實驗步驟[:：]',
-    '這篇文獻的研究成果[:：]'
+    '這篇文獻的研究成果[:：]',
+    '這篇文獻對提示詞生成結果的量化方法[:：]'
 ];
 
 // 提取数据的函数
@@ -41,41 +43,25 @@ async function processThesis() {
     let conn;
     try {
         conn = await pool.getConnection();
-        const rows = await conn.query('SELECT id, response FROM thesis WHERE is_used = 0');
+        // 使用 Promise 和 async/await 處理查詢
+        const query = util.promisify(conn.query).bind(conn);
+        const rows = await query('SELECT id, response FROM thesis WHERE is_used = 0');
 
-        for (let row of rows) {
-            let data = {};
-            keys.forEach((key, index) => {
-                const keyRegex = new RegExp(key);
-                const nextKeyRegex = index < keys.length - 1 ? new RegExp(keys.slice(index + 1).join('|')) : null;
-                data[key] = extractData(row.response, keyRegex, nextKeyRegex);
-            });
+        // 更新数据库
+        await conn.query('UPDATE thesis SET is_used = 1, t_name = ?, apa = ?, url = ?, method = ?, t_method = ?, research_step = ?, research_final = ? , result_method = ? WHERE id = ?', [
+            data[keys[0]],
+            data[keys[1]],
+            data[keys[2]],
+            data[keys[3]],
+            data[keys[4]],
+            data[keys[5]],
+            data[keys[6]],
+            data[keys[7]],
+            row.id
+        ]);
 
-            // 清理数据
-            for (let key in data) {
-                data[key] = data[key]
-                    .replace(/\\n-/g, ' ') // 去除换行符
-                    .replace(/\\n/g, ' ') // 去除换行符
-                    .replace(/["\\'\n]/g, '')
-                    .replace(/\*\*(.*?)\*\*/g, '$1') // 去除粗体
-                    .replace(/\[\^\d+\^\]|\[\d+\]|\d+\./g, ''); // 去除引用标记
+        console.log(`Processed thesis ID: ${row.id}`);
 
-            }
-
-            // 更新数据库
-            await conn.query('UPDATE thesis SET is_used = 1, t_name = ?, apa = ?, url = ?, method = ?, t_method = ?, research_step = ?, research_final = ? WHERE id = ?', [
-                data[keys[0]],
-                data[keys[1]],
-                data[keys[2]],
-                data[keys[3]],
-                data[keys[4]],
-                data[keys[5]],
-                data[keys[6]],
-                row.id
-            ]);
-
-            console.log(`Processed thesis ID: ${row.id}`);
-        }
 
     } catch (err) {
         console.log(err);
